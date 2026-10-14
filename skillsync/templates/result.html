@@ -1,0 +1,223 @@
+{% extends "base.html" %}
+{% block title %}SkillSync — Results{% endblock %}
+
+{% block content %}
+<section class="results-header">
+  <div class="score-ring" style="--pct: {{ ats_score }}">
+    <span class="score-value">{{ ats_score }}%</span>
+    <span class="score-label">ATS Score</span>
+  </div>
+  <div class="score-breakdown">
+    <h2>Fit for {{ domain }}</h2>
+    <ul>
+      <li><strong>Keyword match:</strong> {{ keyword_score }}%</li>
+      <li><strong>Semantic similarity:</strong> {{ semantic_score }}% <span class="tag">{{ semantic_engine }}</span></li>
+    </ul>
+  </div>
+</section>
+
+<section class="card">
+  <h3>AI Resume Summary</h3>
+  <p>{{ summary }}</p>
+</section>
+
+<section class="two-col">
+  <div class="card">
+    <h3>✅ Matched Skills</h3>
+    {% if matched %}
+      <div class="chip-row">
+        {% for s in matched %}<span class="chip chip-good">{{ s }}</span>{% endfor %}
+      </div>
+    {% else %}
+      <p class="muted">No matched skills detected yet.</p>
+    {% endif %}
+  </div>
+  <div class="card">
+    <h3>⚠️ Missing Skills</h3>
+    {% if missing %}
+      <div class="chip-row">
+        {% for s in missing %}<span class="chip chip-warn">{{ s }}</span>{% endfor %}
+      </div>
+    {% else %}
+      <p class="muted">Great — no major skill gaps detected.</p>
+    {% endif %}
+  </div>
+</section>
+
+<section class="card">
+  <h3>Why these gaps matter</h3>
+  <p>{{ gap_explanation }}</p>
+</section>
+
+<section class="card">
+  <h3>Formatting Check</h3>
+  <p>Word count: {{ formatting.word_count }} · Bullet points: {{ formatting.bullet_count }}
+     · Email detected: {{ "Yes" if formatting.has_email else "No" }}
+     · Phone detected: {{ "Yes" if formatting.has_phone else "No" }}</p>
+  {% if formatting.issues %}
+    <ul class="issue-list">
+      {% for issue in formatting.issues %}<li>{{ issue }}</li>{% endfor %}
+    </ul>
+  {% else %}
+    <p class="muted">No major formatting issues detected.</p>
+  {% endif %}
+</section>
+
+<section class="card internship-recommendations-section">
+  <div class="card-head-row">
+    <div>
+      <p class="eyebrow">PORTAL MATCHES</p>
+      <h3>Recommended Internships — {{ domain }}</h3>
+      <p class="muted">Matched and ranked for your resume from the <strong>AICTE Internship Portal &amp; PM Internship Scheme</strong>.</p>
+    </div>
+    <span class="badge aicte-source-badge">🇮🇳 AICTE / PMIS Aligned</span>
+  </div>
+
+  <div class="internship-cards-grid">
+    {% for job in internships %}
+      <div class="internship-card-item {% if job.id in applied_ids %}is-applied{% endif %}">
+        <div class="internship-card-header">
+          <div class="internship-title-group">
+            <span class="portal-badge {% if 'PM' in job.portal_type %}portal-pmis{% elif 'TULIP' in job.portal_type %}portal-tulip{% else %}portal-aicte{% endif %}">
+              {{ job.portal_type }}
+            </span>
+            <h4 class="internship-job-title">{{ job.title }}</h4>
+            <p class="internship-company-name">🏛️ {{ job.company }}</p>
+          </div>
+          <div class="match-score-pill" title="Compatibility with your resume">
+            <span class="match-score-value">{{ job.match_percentage }}%</span>
+            <span class="match-score-text">Fit</span>
+          </div>
+        </div>
+
+        <p class="internship-desc">{{ job.description }}</p>
+
+        <div class="internship-meta-tags">
+          <span class="meta-tag">📍 {{ job.location }}</span>
+          <span class="meta-tag">💰 {{ job.stipend }}</span>
+          <span class="meta-tag">⏱️ {{ job.duration }}</span>
+          <span class="meta-tag">👥 {{ job.openings }}</span>
+        </div>
+
+        <div class="internship-skills-comparison">
+          <span class="skills-label muted">Skills needed:</span>
+          <div class="chip-row">
+            {% for s in job.skills_required %}
+              {% if s in job.matching_skills %}
+                <span class="chip chip-good" title="Found in your resume">✓ {{ s }}</span>
+              {% else %}
+                <span class="chip chip-warn" title="Missing from your resume">— {{ s }}</span>
+              {% endif %}
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="internship-card-actions">
+          {% if job.id in applied_ids %}
+            <button type="button" class="btn-applied" disabled>✓ Applied via SkillSync</button>
+          {% else %}
+            <form action="{{ url_for('apply_internship', internship_id=job.id) }}" method="post" class="apply-form" onsubmit="handleApplySubmit(event, this)">
+              <input type="hidden" name="title" value="{{ job.title }}">
+              <input type="hidden" name="company" value="{{ job.company }}">
+              <input type="hidden" name="portal_type" value="{{ job.portal_type }}">
+              <input type="hidden" name="stipend" value="{{ job.stipend }}">
+              <input type="hidden" name="location" value="{{ job.location }}">
+              <input type="hidden" name="portal_url" value="{{ job.portal_url }}">
+              <button type="submit" class="btn-primary btn-apply">Direct Apply with Resume</button>
+            </form>
+          {% endif %}
+          <a href="{{ job.portal_url }}" target="_blank" rel="noopener noreferrer" class="btn-secondary btn-portal-link" title="Open official AICTE portal">
+            Official Portal ↗
+          </a>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="card">
+  <h3>💬 Advisory Chatbot</h3>
+  <p class="muted">Ask a follow-up question about your resume or this role.</p>
+  <div id="chat-log" class="chat-log"></div>
+  <form id="chat-form" class="chat-form">
+    <input type="text" id="chat-input" placeholder="e.g. How can I improve my ATS score?" autocomplete="off">
+    <button type="submit" class="btn-primary">Send</button>
+  </form>
+</section>
+
+<div class="cta-row">
+  <a href="{{ url_for('interview_start') }}" class="btn-secondary">Try the Mock Interview →</a>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const chatForm = document.getElementById('chat-form');
+const chatInput = document.getElementById('chat-input');
+const chatLog = document.getElementById('chat-log');
+
+function addMessage(text, who) {
+  const div = document.createElement('div');
+  div.className = 'chat-msg ' + who;
+  div.textContent = text;
+  chatLog.appendChild(div);
+  chatLog.scrollTop = chatLog.scrollHeight;
+}
+
+chatForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const message = chatInput.value.trim();
+  if (!message) return;
+  addMessage(message, 'user');
+  chatInput.value = '';
+  addMessage('Thinking…', 'bot pending');
+
+  try {
+    const res = await fetch("{{ url_for('chatbot') }}", {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({message})
+    });
+    const data = await res.json();
+    document.querySelector('.chat-msg.pending').remove();
+    addMessage(data.reply, 'bot');
+  } catch (err) {
+    document.querySelector('.chat-msg.pending').remove();
+    addMessage('Something went wrong reaching the chatbot.', 'bot');
+  }
+});
+
+async function handleApplySubmit(event, form) {
+  event.preventDefault();
+  const submitBtn = form.querySelector('button[type="submit"]');
+  const originalText = submitBtn.textContent;
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Submitting...';
+
+  const formData = new FormData(form);
+  try {
+    const res = await fetch(form.action, {
+      method: 'POST',
+      body: formData,
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest'
+      }
+    });
+    const data = await res.json();
+    if (data.success) {
+      submitBtn.textContent = '✓ Applied via SkillSync';
+      submitBtn.className = 'btn-applied';
+      if (data.portal_url) {
+        window.open(data.portal_url, '_blank');
+      }
+    } else {
+      submitBtn.textContent = originalText;
+      submitBtn.disabled = false;
+      alert(data.message || 'Error submitting application.');
+    }
+  } catch (err) {
+    form.submit();
+  }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}SkillSync — Log in{% endblock %}
+
+{% block content %}
+<div class="auth-wrapper">
+  <div class="auth-card">
+    <!-- Auth Toggle Tabs -->
+    <div class="auth-tabs">
+      <a href="{{ url_for('login') }}" class="auth-tab active">Log in</a>
+      <a href="{{ url_for('signup') }}" class="auth-tab">Sign up</a>
+    </div>
+
+    <div class="auth-header">
+      <p class="eyebrow">STEP 1: AUTHENTICATION</p>
+      <h1>Log in to SkillSync</h1>
+      <p class="subtitle">Please log in or create an account to access the Resume ATS analyzer and Mock Interview simulator.</p>
+    </div>
+
+    <form action="{{ url_for('login') }}" method="post" class="form auth-form">
+      {% if next %}
+        <input type="hidden" name="next" value="{{ next }}">
+      {% endif %}
+
+      <div class="form-group">
+        <label for="identifier">Username or Email</label>
+        <input
+          type="text"
+          id="identifier"
+          name="identifier"
+          placeholder="e.g. alex or alex@example.com"
+          value="{{ identifier or '' }}"
+          required
+          autocomplete="username"
+          autofocus
+        >
+      </div>
+
+      <div class="form-group">
+        <div class="label-row">
+          <label for="password">Password</label>
+        </div>
+        <div class="password-field-wrapper">
+          <input
+            type="password"
+            id="password"
+            name="password"
+            placeholder="Enter your password"
+            required
+            autocomplete="current-password"
+          >
+          <button type="button" class="btn-toggle-pwd" onclick="togglePasswordVisibility('password', this)" aria-label="Toggle password visibility">
+            👁
+          </button>
+        </div>
+      </div>
+
+      <button type="submit" class="btn-primary btn-auth-submit">Log in to Continue</button>
+    </form>
+
+    <div class="auth-card-footer">
+      <p>New here? <a href="{{ url_for('signup') }}" class="auth-inline-link">Create a free account in 30 seconds</a></p>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  function togglePasswordVisibility(fieldId, btn) {
+    const input = document.getElementById(fieldId);
+    if (!input) return;
+    if (input.type === 'password') {
+      input.type = 'text';
+      btn.textContent = '🙈';
+    } else {
+      input.type = 'password';
+      btn.textContent = '👁';
+    }
+  }
+</script>
+{% endblock %}

@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}SkillSync — Resume feedback{% endblock %}
+{% block content %}
+<section class="hero"><p class="eyebrow">CAREER PRACTICE, SIMPLIFIED</p><h1>Know what to improve before you apply.</h1><p class="subtitle">Upload a resume for clear feedback, then practise the interview in a calm virtual room.</p></section>
+{% if error %}<div class="alert">{{ error }}</div>{% endif %}
+<section class="card"><form action="{{ url_for('analyze') }}" method="post" enctype="multipart/form-data" class="form">
+  <label for="domain">Target role</label><select name="domain" id="domain" required><option value="" disabled selected>Choose a domain…</option>{% for d in domains %}<option value="{{ d }}">{{ d }}</option>{% endfor %}</select>
+  <label for="resume">Resume PDF</label><input type="file" name="resume" id="resume" accept="application/pdf" required>
+  <button type="submit" class="btn-primary">Review my resume</button>
+</form></section>
+<section class="next-step"><div><p class="eyebrow">NEXT STEP</p><h2>Prefer to practise out loud?</h2><p>Try a guided virtual mock interview with a webcam preview, timer, and tailored feedback.</p></div><a href="{{ url_for('interview_start') }}" class="btn-secondary">Start virtual interview</a></section>
+{% endblock %}

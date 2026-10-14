@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}SkillSync — Interview Report{% endblock %}
+
+{% block content %}
+<section class="results-header">
+  <div class="score-ring" style="--pct: {{ avg_score * 10 }}">
+    <span class="score-value">{{ avg_score }}/10</span>
+    <span class="score-label">Overall Readiness</span>
+  </div>
+  <div class="score-breakdown">
+    <h2>Mock Interview Report — {{ domain }}</h2>
+    <p class="muted">{{ qa|length }} question(s) answered</p>
+  </div>
+</section>
+
+<section class="card">
+  <h3>Personalized Feedback Report</h3>
+  <p>{{ report }}</p>
+</section>
+
+<section class="card">
+  <h3>Question-by-Question Breakdown</h3>
+  {% for question, answer, score, feedback in qa %}
+    <div class="qa-block">
+      <p class="qa-question"><strong>Q{{ loop.index }}:</strong> {{ question }}</p>
+      <p class="qa-answer">{{ answer }}</p>
+      <p class="qa-feedback"><span class="tag">Score: {{ score }}/10</span> {{ feedback }}</p>
+    </div>
+  {% endfor %}
+</section>
+
+<div class="cta-row">
+  <a href="{{ url_for('interview_start') }}" class="btn-secondary">Retake Interview</a>
+  <a href="{{ url_for('index') }}" class="btn-primary">Back to Resume Analyser</a>
+</div>
+{% endblock %}

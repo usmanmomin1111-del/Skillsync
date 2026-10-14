@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% block title %}SkillSync — Create Account{% endblock %}
+
+{% block content %}
+<div class="auth-wrapper">
+  <div class="auth-card">
+    <!-- Auth Toggle Tabs -->
+    <div class="auth-tabs">
+      <a href="{{ url_for('login') }}" class="auth-tab">Log in</a>
+      <a href="{{ url_for('signup') }}" class="auth-tab active">Sign up</a>
+    </div>
+
+    <div class="auth-header">
+      <p class="eyebrow">STEP 1: AUTHENTICATION</p>
+      <h1>Create your account</h1>
+      <p class="subtitle">Sign up to access AI resume evaluations, skills gap analysis, and mock interviews.</p>
+    </div>
+
+    <form action="{{ url_for('signup') }}" method="post" class="form auth-form">
+      <div class="form-group">
+        <label for="full_name">Full Name <span class="muted font-normal">(optional)</span></label>
+        <input
+          type="text"
+          id="full_name"
+          name="full_name"
+          placeholder="e.g. Alex Johnson"
+          value="{{ full_name or '' }}"
+          autocomplete="name"
+          autofocus
+        >
+      </div>
+
+      <div class="form-group">
+        <label for="username">Username <span class="required-star">*</span></label>
+        <input
+          type="text"
+          id="username"
+          name="username"
+          placeholder="e.g. alex_j"
+          value="{{ username or '' }}"
+          required
+          minlength="3"
+          maxlength="30"
+          pattern="[a-zA-Z0-9_.-]{3,30}"
+          title="3-30 characters, letters, numbers, dash, or underscore"
+          autocomplete="username"
+        >
+        <span class="field-hint">3–30 characters (letters, numbers, underscores, or dashes)</span>
+      </div>
+
+      <div class="form-group">
+        <label for="email">Email address <span class="required-star">*</span></label>
+        <input
+          type="email"
+          id="email"
+          name="email"
+          placeholder="alex@example.com"
+          value="{{ email or '' }}"
+          required
+          autocomplete="email"
+        >
+      </div>
+
+      <div class="two-col-inputs">
+        <div class="form-group">
+          <label for="password">Password <span class="required-star">*</span></label>
+          <div class="password-field-wrapper">
+            <input
+              type="password"
+              id="password"
+              name="password"
+              placeholder="At least 6 characters"
+              required
+              minlength="6"
+              autocomplete="new-password"
+            >
+            <button type="button" class="btn-toggle-pwd" onclick="togglePasswordVisibility('password', this)" aria-label="Toggle password visibility">
+              👁
+            </button>
+          </div>
+          <span class="field-hint">Minimum 6 characters</span>
+        </div>
+
+        <div class="form-group">
+          <label for="confirm_password">Confirm Password <span class="required-star">*</span></label>
+          <div class="password-field-wrapper">
+            <input
+              type="password"
+              id="confirm_password"
+              name="confirm_password"
+              placeholder="Repeat password"
+              required
+              minlength="6"
+              autocomplete="new-password"
+            >
+            <button type="button" class="btn-toggle-pwd" onclick="togglePasswordVisibility('confirm_password', this)" aria-label="Toggle confirm password visibility">
+              👁
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <button type="submit" class="btn-primary btn-auth-submit">Create Account &amp; Continue</button>
+    </form>
+
+    <div class="auth-card-footer">
+      <p>Already have an account? <a href="{{ url_for('login') }}" class="auth-inline-link">Log in here</a></p>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  function togglePasswordVisibility(fieldId, btn) {
+    const input = document.getElementById(fieldId);
+    if (!input) return;
+    if (input.type === 'password') {
+      input.type = 'text';
+      btn.textContent = '🙈';
+    } else {
+      input.type = 'password';
+      btn.textContent = '👁';
+    }
+  }
+</script>
+{% endblock %}

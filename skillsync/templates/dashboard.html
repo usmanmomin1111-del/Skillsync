@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+{% block title %}SkillSync — Dashboard{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+  <div class="dashboard-header">
+    <div>
+      <p class="eyebrow">STUDENT PORTAL</p>
+      <h1>Welcome back, {{ user.full_name or user.username }}!</h1>
+      <p class="subtitle muted">Track your resume evaluations, AI mock interviews, and AICTE &amp; PM Internship Scheme applications.</p>
+    </div>
+    <div class="dashboard-actions">
+      <a href="{{ url_for('index') }}" class="btn-primary">New Resume Review</a>
+      <a href="{{ url_for('interview_start') }}" class="btn-secondary">Practice Interview</a>
+    </div>
+  </div>
+
+  <!-- Stats Grid -->
+  <div class="stats-grid stats-grid-5">
+    <div class="stat-card">
+      <span class="stat-number">{{ stats.total_resumes }}</span>
+      <span class="stat-label">Resumes Evaluated</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-number">{{ stats.avg_ats }}%</span>
+      <span class="stat-label">Avg ATS Fit Score</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-number">{{ stats.total_interviews }}</span>
+      <span class="stat-label">Mock Interviews</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-number">{{ stats.avg_interview }}/10</span>
+      <span class="stat-label">Avg Interview Score</span>
+    </div>
+    <div class="stat-card stat-card-highlight">
+      <span class="stat-number">{{ stats.total_applications or 0 }}</span>
+      <span class="stat-label">Internships Applied</span>
+    </div>
+  </div>
+
+  <!-- Applications Section -->
+  <div class="card history-card">
+    <div class="card-head-row">
+      <div>
+        <h3>🏛️ My Internship Applications</h3>
+        <p class="muted font-normal">Applications submitted to AICTE Portal, PM Internship Scheme, and TULIP partners.</p>
+      </div>
+      <span class="badge">{{ applications|length if applications else 0 }} logged</span>
+    </div>
+
+    {% if applications %}
+      <div class="history-list">
+        {% for app in applications %}
+          <div class="history-item app-history-item">
+            <div class="history-main">
+              <div class="app-title-line">
+                <span class="history-title">{{ app.title }}</span>
+                <span class="portal-badge {% if 'PM' in app.portal_type %}portal-pmis{% elif 'TULIP' in app.portal_type %}portal-tulip{% else %}portal-aicte{% endif %}">
+                  {{ app.portal_type }}
+                </span>
+              </div>
+              <span class="history-meta muted">🏛️ {{ app.company }} &middot; 📍 {{ app.location or 'Remote' }} &middot; Applied on {{ app.applied_at }}</span>
+              {% if app.stipend %}
+                <span class="app-stipend-tag">💰 {{ app.stipend }}</span>
+              {% endif %}
+            </div>
+            <div class="app-status-badge">
+              <span class="app-status-pill">✓ Applied</span>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="empty-state">
+        <p class="muted">You haven't applied for any internships yet. Review your resume to see recommended AICTE opportunities!</p>
+        <a href="{{ url_for('index') }}" class="btn-secondary btn-sm">Find Recommended Internships</a>
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="two-col dashboard-columns">
+    <!-- Resume History Section -->
+    <div class="card history-card">
+      <div class="card-head-row">
+        <h3>📄 Recent Resume Evaluations</h3>
+        <span class="badge">{{ analyses|length }} saved</span>
+      </div>
+
+      {% if analyses %}
+        <div class="history-list">
+          {% for item in analyses %}
+            <div class="history-item">
+              <div class="history-main">
+                <span class="history-title">{{ item.domain }}</span>
+                <span class="history-meta muted">{{ item.created_at }}</span>
+                <div class="chip-row item-chips">
+                  <span class="chip chip-good">{{ item.matched_skills|length }} matched</span>
+                  {% if item.missing_skills %}
+                    <span class="chip chip-warn">{{ item.missing_skills|length }} missing</span>
+                  {% endif %}
+                </div>
+              </div>
+              <div class="history-score-badge">
+                <span class="score-pill-number">{{ item.ats_score }}%</span>
+                <span class="score-pill-tag">ATS</span>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="empty-state">
+          <p class="muted">You haven't run any resume evaluations yet.</p>
+          <a href="{{ url_for('index') }}" class="btn-secondary btn-sm">Upload a resume now</a>
+        </div>
+      {% endif %}
+    </div>
+
+    <!-- Interview History Section -->
+    <div class="card history-card">
+      <div class="card-head-row">
+        <h3>🎙️ Mock Interview Sessions</h3>
+        <span class="badge">{{ interviews|length }} saved</span>
+      </div>
+
+      {% if interviews %}
+        <div class="history-list">
+          {% for item in interviews %}
+            <div class="history-item">
+              <div class="history-main">
+                <span class="history-title">{{ item.domain }}</span>
+                <span class="history-meta muted">{{ item.created_at }} &middot; {{ item.qa_list|length }} questions</span>
+                {% if item.report_text %}
+                  <p class="history-snippet muted">{{ item.report_text[:140] }}{% if item.report_text|length > 140 %}...{% endif %}</p>
+                {% endif %}
+              </div>
+              <div class="history-score-badge interview-score-badge">
+                <span class="score-pill-number">{{ item.avg_score }}/10</span>
+                <span class="score-pill-tag">Score</span>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="empty-state">
+          <p class="muted">You haven't completed any mock interviews yet.</p>
+          <a href="{{ url_for('interview_start') }}" class="btn-secondary btn-sm">Start an interview session</a>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
