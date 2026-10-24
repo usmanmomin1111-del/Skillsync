@@ -5,6 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}SkillSync{% endblock %}</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <!-- Keep Jinja output out of JavaScript so VS Code can validate this template. -->
+  <script id="skillsync-firebase-config" type="application/json">{{ firebase_config|tojson }}</script>
+  <script>
+    window.skillSyncFirebaseReady = new Promise((resolve) => {
+      window.addEventListener("skillsync:firebase-ready", (event) => resolve(event.detail), { once: true });
+    });
+  </script>
+  <script type="module" src="{{ url_for('static', filename='firebase.js') }}"></script>
 </head>
 <body>
   <header class="site-header">
@@ -15,11 +23,12 @@
           <a href="{{ url_for('index') }}" class="nav-link">Resume</a>
           <a href="{{ url_for('interview_start') }}" class="nav-link">Interview</a>
           <a href="{{ url_for('dashboard') }}" class="nav-link">Dashboard</a>
+          <a href="{{ url_for('feedback') }}" class="nav-link">Feedback</a>
           <div class="user-session-bar">
             <span class="user-avatar-tag" title="{{ current_user.email }}">
               <span class="avatar-dot"></span>{{ current_user.username }}
             </span>
-            <a href="{{ url_for('logout') }}" class="nav-btn-logout">Log out</a>
+            <a href="{{ url_for('logout') }}" class="nav-btn-logout" data-firebase-logout>Log out</a>
           </div>
         {% else %}
           <a href="{{ url_for('login') }}" class="nav-link">Log in</a>
@@ -64,5 +73,6 @@
   </footer>
 
   {% block scripts %}{% endblock %}
+  <script type="module" src="{{ url_for('static', filename='firebase-auth.js') }}"></script>
 </body>
 </html>

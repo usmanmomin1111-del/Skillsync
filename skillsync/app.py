@@ -11,11 +11,20 @@ Plus:
 """
 import os
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from functools import wraps
+from pathlib import Path
 from urllib.parse import urlparse, urljoin
 
-from dotenv import load_dotenv
-load_dotenv()
+PROJECT_ROOT = Path(__file__).resolve().parent
+FRONTEND_DIR = PROJECT_ROOT / "frontend"
+DATA_DIR = PROJECT_ROOT / "data"
+
+try:
+    from dotenv import load_dotenv
+    load_dotenv(PROJECT_ROOT / ".env")
+except Exception:
+    pass  # .env file unreadable — use fallback below
 
 from flask import (
     Flask,
@@ -28,27 +37,45 @@ from flask import (
     flash,
 )
 
-import db
-from utils.resume_parser import extract_text_from_pdf, check_formatting
-from utils.scorer import (
+from backend import db
+from backend.utils.resume_parser import extract_text_from_pdf, check_formatting
+from backend.utils.scorer import (
     keyword_match,
     semantic_similarity,
     skill_gap,
     compute_ats_score,
     rank_internships_for_resume,
 )
-from utils.skills_data import DOMAINS, INTERVIEW_QUESTIONS
-from utils import gemini_helper
+from backend.utils.skills_data import DOMAINS, INTERVIEW_QUESTIONS
+from backend.utils import gemini_helper
+from backend.utils.aicte_internships import get_recommendations
 
-app = Flask(__name__)
+app = Flask(
+    __name__,
+    template_folder=str(FRONTEND_DIR / "templates"),
+    static_folder=str(FRONTEND_DIR / "static"),
+    static_url_path="/static",
+)
 app.secret_key = os.environ.get("SECRET_KEY", "skillsync-dev-secret-key-change-in-prod")
 app.config["MAX_CONTENT_LENGTH"] = 8 * 1024 * 1024  # 8 MB upload limit
+# Firebase's web configuration is intentionally safe to expose in the browser.
+# Keep the values in environment variables in production so a deployment can use
+# a different Firebase project without a code change.
+app.config["FIREBASE_CONFIG"] = {
+    "apiKey": os.environ.get("FIREBASE_API_KEY", "AIzaSyDGTw51opzCyTk3I_yZaXTrVKngHOWesB4"),
+    "authDomain": os.environ.get("FIREBASE_AUTH_DOMAIN", "skillsync-f84cb.firebaseapp.com"),
+    "projectId": os.environ.get("FIREBASE_PROJECT_ID", "skillsync-f84cb"),
+    "storageBucket": os.environ.get("FIREBASE_STORAGE_BUCKET", "skillsync-f84cb.firebasestorage.app"),
+    "messagingSenderId": os.environ.get("FIREBASE_MESSAGING_SENDER_ID", "144312228609"),
+    "appId": os.environ.get("FIREBASE_APP_ID", "1:144312228609:web:f8ddb11ad7a5c28eb31900"),
+    "measurementId": os.environ.get("FIREBASE_MEASUREMENT_ID", "G-W0JTGCTHJL"),
+}
 
 # Initialize SQLite database schema
 db.init_db(app)
 
-UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "uploads")
-os.makedirs(UPLOAD_DIR, exist_ok=True)
+UPLOAD_DIR = DATA_DIR / "uploads"
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 # In-memory store for active session analysis
 ANALYSES = {}
@@ -84,8 +111,8 @@ def inject_current_user():
     user_id = session.get("user_id")
     if user_id:
         user = db.get_user_by_id(user_id)
-        return {"current_user": user}
-    return {"current_user": None}
+        return {"current_user": user, "firebase_config": app.config["FIREBASE_CONFIG"]}
+    return {"current_user": None, "firebase_config": app.config["FIREBASE_CONFIG"]}
 
 
 # -----------------------------------------------------------------------------
@@ -195,6 +222,28 @@ def dashboard():
     )
 
 
+@app.route("/feedback", methods=["GET", "POST"])
+@login_required
+def feedback():
+    """Collect a student's 1-5 star rating and optional SkillSync feedback."""
+    if request.method == "POST":
+        rating = request.form.get("rating")
+        message = request.form.get("message", "").strip()
+
+        if len(message) > 1000:
+            flash("Feedback must be 1000 characters or fewer.", "error")
+            return render_template("feedback.html", rating=rating, message=message), 400
+
+        if not db.save_feedback(session.get("user_id"), rating, message):
+            flash("Please select a star rating from 1 to 5.", "error")
+            return render_template("feedback.html", rating=rating, message=message), 400
+
+        flash("Thank you! Your feedback has been saved.", "success")
+        return redirect(url_for("feedback"))
+
+    return render_template("feedback.html")
+
+
 # -----------------------------------------------------------------------------
 # Core SkillSync Routes (Resume Analysis & Mock Interview)
 # -----------------------------------------------------------------------------
@@ -233,18 +282,35 @@ def analyze():
     # 3. Keyword Matching
     km = keyword_match(resume_text, role_data["skills"])
 
-    # 4. Semantic Similarity (SBERT)
-    sem = semantic_similarity(resume_text, role_data["description"], role_data["skills"])
-
     # 5. Skill Gap Detection
     gap = skill_gap(km["matched"], km["missing"])
 
+    # Semantic scoring, optional Gemini feedback, and public internship lookup
+    # do not depend on each other.  Run them together so the user waits for the
+    # slowest service, rather than the combined time of all four operations.
+    # The displayed score and recommendation data are unchanged.
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        semantic_future = executor.submit(
+            semantic_similarity,
+            resume_text,
+            role_data["description"],
+            role_data["skills"],
+        )
+        summary_future = executor.submit(
+            gemini_helper.generate_resume_summary, resume_text, domain
+        )
+        gap_explanation_future = executor.submit(
+            gemini_helper.explain_skill_gaps, gap["missing"], domain
+        )
+        internships_future = executor.submit(get_recommendations, domain)
+
+        sem = semantic_future.result()
+        summary = summary_future.result()
+        gap_explanation = gap_explanation_future.result()
+        live_internships = internships_future.result()
+
     # Hybrid ATS score
     ats_score = compute_ats_score(km["score"], sem["score"])
-
-    # 6. Gemini AI Layer
-    summary = gemini_helper.generate_resume_summary(resume_text, domain)
-    gap_explanation = gemini_helper.explain_skill_gaps(gap["missing"], domain)
 
     analysis_id = str(uuid.uuid4())
     ANALYSES[analysis_id] = {
@@ -270,8 +336,9 @@ def analyze():
             missing_skills=gap["missing"],
         )
 
-    # Dynamically rank AICTE & PMIS internships based on candidate's matching skills
-    ranked_internships = rank_internships_for_resume(role_data["internships"], gap["matched"])
+    # Use only public, currently open AICTE listings.  Each details URL is
+    # verified against AICTE's individual-listing endpoint before display.
+    ranked_internships = rank_internships_for_resume(live_internships, gap["matched"])
     applied_ids = db.get_user_applied_ids(user_id) if user_id else set()
 
     return render_template(
@@ -295,7 +362,7 @@ def analyze():
 @app.route("/apply/<internship_id>", methods=["POST"])
 @login_required
 def apply_internship(internship_id):
-    """Direct application endpoint for recommended AICTE/PMIS internships."""
+    """Save an official listing locally; applications stay on the AICTE portal."""
     user_id = session.get("user_id")
     title = request.form.get("title", "Internship Role")
     company = request.form.get("company", "AICTE Partner")
@@ -319,13 +386,13 @@ def apply_internship(internship_id):
             "success": True,
             "already_applied": not is_new,
             "portal_url": portal_url,
-            "message": f"Application for '{title}' submitted successfully! Profile logged into AICTE partner queue.",
+            "message": f"Saved '{title}' to your SkillSync dashboard. Open the official details page to apply on AICTE.",
         })
 
     if is_new:
-        flash(f"Application submitted for '{title}' at {company}! Saved to your dashboard.", "success")
+        flash(f"Saved '{title}' at {company}. Open the official AICTE details page to apply.", "success")
     else:
-        flash(f"You have already applied for '{title}'.", "info")
+        flash(f"'{title}' is already saved in your dashboard.", "info")
 
     return redirect(request.referrer or url_for("dashboard"))
 

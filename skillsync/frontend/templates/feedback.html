@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}SkillSync — Feedback{% endblock %}
+
+{% block content %}
+<section class="feedback-page">
+  <div class="hero feedback-hero">
+    <p class="eyebrow">STUDENT FEEDBACK</p>
+    <h1>How was your SkillSync experience?</h1>
+    <p class="subtitle">Your rating and suggestion help us improve the resume analysis and mock interview experience.</p>
+  </div>
+
+  <section class="card feedback-card" aria-labelledby="feedback-heading">
+    <h2 id="feedback-heading">Share your feedback</h2>
+    <form method="post" class="form feedback-form">
+      <fieldset class="rating-fieldset">
+        <legend>Rate SkillSync <span aria-hidden="true">*</span></legend>
+        <p id="rating-help" class="muted">Select from 1 star (poor) to 5 stars (excellent).</p>
+        <div class="star-rating" aria-describedby="rating-help">
+          {% for value in range(5, 0, -1) %}
+            <input
+              type="radio"
+              id="rating-{{ value }}"
+              name="rating"
+              value="{{ value }}"
+              {% if rating|string == value|string %}checked{% endif %}
+              {% if value == 5 %}required{% endif %}
+            >
+            <label for="rating-{{ value }}" title="{{ value }} out of 5 stars">{{ value }} star{{ '' if value == 1 else 's' }}</label>
+          {% endfor %}
+        </div>
+      </fieldset>
+
+      <label for="message">Feedback or suggestion <span class="muted">(optional)</span></label>
+      <textarea id="message" name="message" rows="6" maxlength="1000" placeholder="Tell us what worked well or what we can improve…">{{ message or '' }}</textarea>
+      <p class="muted feedback-note">Please do not include passwords, API keys, or other private information.</p>
+      <button type="submit" class="btn-primary">Submit feedback</button>
+    </form>
+  </section>
+</section>
+{% endblock %}

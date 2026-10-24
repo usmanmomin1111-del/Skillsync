@@ -9,10 +9,12 @@ import re
 import json
 import sqlite3
 from datetime import datetime
+from pathlib import Path
 from flask import g, has_app_context
 from werkzeug.security import generate_password_hash, check_password_hash
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "skillsync.db")
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+DB_PATH = str(PROJECT_ROOT / "data" / "skillsync.db")
 
 
 def get_db():
@@ -101,12 +103,25 @@ def init_db(app=None):
         );
     """)
 
+    # Student feedback submitted from the in-app Feedback page.
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS feedback (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            rating INTEGER NOT NULL CHECK (rating BETWEEN 1 AND 5),
+            message TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+        );
+    """)
+
     # Indexes
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_analyses_user ON resume_analyses(user_id);")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_interviews_user ON interview_sessions(user_id);")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_apps_user ON internship_applications(user_id);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_feedback_user ON feedback(user_id);")
 
     conn.commit()
     conn.close()
@@ -430,3 +445,29 @@ def get_user_applied_ids(user_id):
         (user_id,)
     ).fetchall()
     return {r["internship_id"] for r in rows}
+
+
+def save_feedback(user_id, rating, message=""):
+    """Store one authenticated user's SkillSync rating and optional comment."""
+    if not user_id:
+        return False
+
+    try:
+        rating = int(rating)
+    except (TypeError, ValueError):
+        return False
+
+    if rating not in range(1, 6):
+        return False
+
+    message = (message or "").strip()
+    db = get_db()
+    db.execute(
+        """
+        INSERT INTO feedback (user_id, rating, message)
+        VALUES (?, ?, ?)
+        """,
+        (user_id, rating, message or None),
+    )
+    db.commit()
+    return True

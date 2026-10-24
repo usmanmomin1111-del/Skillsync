@@ -16,7 +16,7 @@
       <p class="subtitle">Sign up to access AI resume evaluations, skills gap analysis, and mock interviews.</p>
     </div>
 
-    <form action="{{ url_for('signup') }}" method="post" class="form auth-form">
+    <form action="{{ url_for('signup') }}" method="post" class="form auth-form" data-firebase-signup>
       <div class="form-group">
         <label for="full_name">Full Name <span class="muted font-normal">(optional)</span></label>
         <input

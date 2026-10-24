@@ -43,8 +43,8 @@
   <div class="card history-card">
     <div class="card-head-row">
       <div>
-        <h3>🏛️ My Internship Applications</h3>
-        <p class="muted font-normal">Applications submitted to AICTE Portal, PM Internship Scheme, and TULIP partners.</p>
+        <h3>🏛️ My Saved Internships</h3>
+        <p class="muted font-normal">Official AICTE listings saved from SkillSync. Open each listing on AICTE to submit an application.</p>
       </div>
       <span class="badge">{{ applications|length if applications else 0 }} logged</span>
     </div>
@@ -60,20 +60,20 @@
                   {{ app.portal_type }}
                 </span>
               </div>
-              <span class="history-meta muted">🏛️ {{ app.company }} &middot; 📍 {{ app.location or 'Remote' }} &middot; Applied on {{ app.applied_at }}</span>
+              <span class="history-meta muted">🏛️ {{ app.company }} &middot; 📍 {{ app.location or 'Remote' }} &middot; Saved on {{ app.applied_at }}</span>
               {% if app.stipend %}
                 <span class="app-stipend-tag">💰 {{ app.stipend }}</span>
               {% endif %}
             </div>
             <div class="app-status-badge">
-              <span class="app-status-pill">✓ Applied</span>
+              <span class="app-status-pill">Saved</span>
             </div>
           </div>
         {% endfor %}
       </div>
     {% else %}
       <div class="empty-state">
-        <p class="muted">You haven't applied for any internships yet. Review your resume to see recommended AICTE opportunities!</p>
+        <p class="muted">You haven't saved an internship yet. Review your resume to see live AICTE opportunities.</p>
         <a href="{{ url_for('index') }}" class="btn-secondary btn-sm">Find Recommended Internships</a>
       </div>
     {% endif %}

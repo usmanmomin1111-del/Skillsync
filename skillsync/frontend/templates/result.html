@@ -68,9 +68,9 @@
     <div>
       <p class="eyebrow">PORTAL MATCHES</p>
       <h3>Recommended Internships — {{ domain }}</h3>
-      <p class="muted">Matched and ranked for your resume from the <strong>AICTE Internship Portal &amp; PM Internship Scheme</strong>.</p>
+      <p class="muted">Live public listings from the <strong>AICTE National Internship Portal</strong>, ranked for your resume. Every card links to its specific official details page.</p>
     </div>
-    <span class="badge aicte-source-badge">🇮🇳 AICTE / PMIS Aligned</span>
+    <span class="badge aicte-source-badge">🇮🇳 Live AICTE listings</span>
   </div>
 
   <div class="internship-cards-grid">
@@ -97,6 +97,7 @@
           <span class="meta-tag">💰 {{ job.stipend }}</span>
           <span class="meta-tag">⏱️ {{ job.duration }}</span>
           <span class="meta-tag">👥 {{ job.openings }}</span>
+          <span class="meta-tag">Deadline: {{ job.deadline }}</span>
         </div>
 
         <div class="internship-skills-comparison">
@@ -114,7 +115,7 @@
 
         <div class="internship-card-actions">
           {% if job.id in applied_ids %}
-            <button type="button" class="btn-applied" disabled>✓ Applied via SkillSync</button>
+            <button type="button" class="btn-applied" disabled>✓ Saved in SkillSync</button>
           {% else %}
             <form action="{{ url_for('apply_internship', internship_id=job.id) }}" method="post" class="apply-form" onsubmit="handleApplySubmit(event, this)">
               <input type="hidden" name="title" value="{{ job.title }}">
@@ -123,13 +124,21 @@
               <input type="hidden" name="stipend" value="{{ job.stipend }}">
               <input type="hidden" name="location" value="{{ job.location }}">
               <input type="hidden" name="portal_url" value="{{ job.portal_url }}">
-              <button type="submit" class="btn-primary btn-apply">Direct Apply with Resume</button>
+              <button type="submit" class="btn-secondary btn-apply">Save to Dashboard</button>
             </form>
           {% endif %}
-          <a href="{{ job.portal_url }}" target="_blank" rel="noopener noreferrer" class="btn-secondary btn-portal-link" title="Open official AICTE portal">
-            Official Portal ↗
+          <a href="{{ job.details_url }}" target="_blank" rel="noopener noreferrer" class="btn-primary btn-direct-link" title="Open this internship's official AICTE details page">
+            View Official Details ↗
           </a>
         </div>
+        {% if job.application_login_required %}
+          <p class="muted small-text">Apply on the official details page. AICTE student login may be required.</p>
+        {% endif %}
+      </div>
+    {% else %}
+      <div class="empty-state">
+        <p class="muted">Live AICTE listings could not be loaded right now, so SkillSync is not showing unverified recommendations.</p>
+        <a href="https://internship.aicte-india.org/internships" target="_blank" rel="noopener noreferrer" class="btn-secondary btn-sm">Browse official AICTE internships</a>
       </div>
     {% endfor %}
   </div>
@@ -192,7 +201,7 @@ async function handleApplySubmit(event, form) {
   const submitBtn = form.querySelector('button[type="submit"]');
   const originalText = submitBtn.textContent;
   submitBtn.disabled = true;
-  submitBtn.textContent = 'Submitting...';
+  submitBtn.textContent = 'Saving...';
 
   const formData = new FormData(form);
   try {
@@ -205,11 +214,8 @@ async function handleApplySubmit(event, form) {
     });
     const data = await res.json();
     if (data.success) {
-      submitBtn.textContent = '✓ Applied via SkillSync';
+      submitBtn.textContent = '✓ Saved in SkillSync';
       submitBtn.className = 'btn-applied';
-      if (data.portal_url) {
-        window.open(data.portal_url, '_blank');
-      }
     } else {
       submitBtn.textContent = originalText;
       submitBtn.disabled = false;

@@ -138,6 +138,53 @@ select:focus, input:focus, textarea:focus {
 }
 .btn-secondary:hover { background: var(--surface); }
 
+/* Feedback */
+.feedback-page { max-width: 680px; }
+.feedback-hero { margin-bottom: 24px; }
+.feedback-card h2 { font-size: 1.35rem; }
+.feedback-form { max-width: none; }
+.rating-fieldset {
+  margin: 4px 0 8px;
+  padding: 0;
+  border: 0;
+}
+.rating-fieldset legend { font-weight: 600; font-size: 0.98rem; }
+.rating-fieldset .muted { margin: 4px 0 10px; }
+.star-rating {
+  display: inline-flex;
+  flex-direction: row-reverse;
+  gap: 4px;
+}
+.star-rating input {
+  position: absolute;
+  opacity: 0;
+}
+.star-rating label {
+  margin: 0;
+  color: #CDD3DD;
+  cursor: pointer;
+  line-height: 1;
+  transition: color 0.15s ease, transform 0.15s ease;
+}
+.star-rating label { font-size: 0; }
+.star-rating label::before {
+  content: "★";
+  display: block;
+  font-size: 2.2rem;
+  line-height: 1;
+}
+.star-rating label:hover,
+.star-rating label:hover ~ label,
+.star-rating input:checked ~ label { color: var(--accent); }
+.star-rating label:hover { transform: scale(1.08); }
+.star-rating input:focus-visible + label {
+  outline: 2px solid var(--ink);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+.feedback-note { margin: 0; }
+.feedback-form .btn-primary { align-self: flex-start; }
+
 .cta-row { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 8px; }
 
 .alert {
@@ -977,6 +1024,25 @@ select:focus, input:focus, textarea:focus {
   margin: 0;
   padding: 8px 16px;
   font-size: 0.88rem;
+}
+.btn-direct-link {
+  margin: 0;
+  padding: 9px 18px;
+  font-size: 0.92rem;
+  background: #1a7f4b;
+  color: #fff !important;
+  border-radius: 8px;
+  border: none;
+  font-weight: 600;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: background 0.2s;
+}
+.btn-direct-link:hover {
+  background: #145e37;
+  color: #fff !important;
 }
 
 /* Dashboard applications */

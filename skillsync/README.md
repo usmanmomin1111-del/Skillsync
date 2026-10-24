@@ -21,7 +21,7 @@ Plus: domain selection, **AICTE & PM Internship Scheme recommendation engine**, 
 - SQLite3 & Werkzeug Security (user authentication, password hashing, persistent storage)
 - HTML & CSS (front-end interface, server-rendered Jinja2 templates)
 - Sentence-BERT (`sentence-transformers`)
-- Gemini AI API (`google-generativeai`)
+- Gemini AI API (`google-genai`)
 
 ## Features & Recommendation Architecture
 
@@ -72,17 +72,24 @@ python test_auth.py
 
 ```
 skillsync/
-├── app.py                  # Flask routes & authentication endpoints
-├── db.py                   # SQLite database models, hashing, and queries
+├── app.py                  # Flask start file: python app.py
 ├── test_auth.py            # Automated tests for auth, validation & persistence
 ├── requirements.txt
-├── utils/
-│   ├── resume_parser.py    # Text extraction + formatting check
-│   ├── scorer.py           # Keyword matching + SBERT semantic similarity
-│   ├── skills_data.py      # Domain skill sets, internships, interview questions
-│   └── gemini_helper.py    # Gemini AI layer (summary/explanations/chatbot/interview)
-├── templates/              # HTML (Jinja2: base, index, login, signup, dashboard, etc.)
-└── static/style.css        # CSS including auth and dashboard styling
+├── frontend/
+│   ├── templates/          # HTML (Jinja2: base, index, login, signup, dashboard, etc.)
+│   └── static/             # CSS and browser Firebase JavaScript
+├── backend/
+│   ├── db.py               # SQLite database models, hashing, and queries
+│   └── utils/
+│       ├── resume_parser.py    # Text extraction + formatting check
+│       ├── scorer.py           # Keyword matching + SBERT semantic similarity
+│       ├── skills_data.py      # Domain skill sets and interview questions
+│       ├── gemini_helper.py    # Gemini AI layer
+│       └── aicte_internships.py # Verified live AICTE listings
+├── data/
+│   ├── uploads/            # Uploaded resume PDFs
+│   └── skillsync.db        # Local SQLite database
+└── docs/PROJECT_STRUCTURE.md
 ```
 
 ## Notes
@@ -90,6 +97,26 @@ skillsync/
 - The resume must be a **text-based PDF** (not a scanned image) — extraction uses `PyPDF2`.
 - The first request that needs Sentence-BERT downloads the `all-MiniLM-L6-v2` model
   (~90 MB) from Hugging Face; it's cached locally after that.
-- Internship listings and the interview question bank are sample/static data —
-  swap `utils/skills_data.py` for a real dataset or API when you're ready.
-- User accounts, resume history, and interview reports are persisted in `skillsync.db` SQLite database.
+- Internship recommendations use the public AICTE catalogue; exact detail links are verified before display.
+- User accounts, resume history, and interview reports are persisted in `data/skillsync.db`.
+
+## Firebase connection
+
+The Firebase Web SDK is loaded on every page and initialized with the
+`skillsync-f84cb` project configuration. Browser code can access the initialized
+services through `window.skillSyncFirebase`:
+
+```js
+window.addEventListener("skillsync:firebase-ready", () => {
+  const { app, auth, db } = window.skillSyncFirebase;
+  // Use Firebase Auth, Firestore, or Storage from page-specific JavaScript.
+});
+```
+
+New signups also create a Firebase Authentication email/password account and a
+Firestore profile document at `users/{firebaseUid}`. Passwords are never stored
+in Firestore. The existing Flask username/password flow and SQLite history remain unchanged.
+To move those records to Firebase, enable the relevant product in the Firebase
+console (for example Email/Password in Authentication or Cloud Firestore) and
+add the corresponding application flow. Do not put a Firebase Admin SDK service
+account JSON file in `frontend/static/` or commit it to the repository.

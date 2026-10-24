@@ -16,7 +16,7 @@
       <p class="subtitle">Please log in or create an account to access the Resume ATS analyzer and Mock Interview simulator.</p>
     </div>
 
-    <form action="{{ url_for('login') }}" method="post" class="form auth-form">
+    <form action="{{ url_for('login') }}" method="post" class="form auth-form" data-firebase-login>
       {% if next %}
         <input type="hidden" name="next" value="{{ next }}">
       {% endif %}

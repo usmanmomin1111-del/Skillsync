@@ -177,15 +177,21 @@ def rank_internships_for_resume(internships: list, candidate_matched_skills: lis
     Appends matching_skills, missing_skills, and match_percentage to each posting.
     Sorts descending so the best-fitting opportunities appear first.
     """
-    matched_set = {s.lower() for s in (candidate_matched_skills or [])}
+    # AICTE's public catalogue may use variants such as "Html" / "HTML" and
+    # "Node.Js" / "Node.js".  Normalize punctuation so matching remains based
+    # on the candidate's existing matched skills rather than string styling.
+    def normalize_skill(skill):
+        return "".join(char for char in str(skill).lower() if char.isalnum())
+
+    matched_set = {normalize_skill(s) for s in (candidate_matched_skills or [])}
     ranked = []
 
     for job in internships:
         item = dict(job)
         req_skills = job.get("skills_required", [])
         if req_skills:
-            matching = [s for s in req_skills if s.lower() in matched_set]
-            missing = [s for s in req_skills if s.lower() not in matched_set]
+            matching = [s for s in req_skills if normalize_skill(s) in matched_set]
+            missing = [s for s in req_skills if normalize_skill(s) not in matched_set]
             pct = round(100.0 * len(matching) / len(req_skills))
         else:
             matching, missing, pct = [], [], 80

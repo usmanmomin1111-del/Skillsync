@@ -8,7 +8,7 @@ import sqlite3
 # Set test environment
 os.environ["SECRET_KEY"] = "test-secret-key"
 
-import db
+from backend import db
 from app import app
 
 
