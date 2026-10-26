@@ -8,13 +8,17 @@ import os
 import re
 import json
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from flask import g, has_app_context
 from werkzeug.security import generate_password_hash, check_password_hash
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DB_PATH = str(PROJECT_ROOT / "data" / "skillsync.db")
+# India has a fixed UTC+05:30 offset and does not observe daylight saving time.
+# Using the standard-library offset keeps the app portable on Windows hosts
+# that do not ship the IANA time-zone database.
+USAGE_TIMEZONE = timezone(timedelta(hours=5, minutes=30))
 
 
 def get_db():
@@ -111,6 +115,18 @@ def init_db(app=None):
             rating INTEGER NOT NULL CHECK (rating BETWEEN 1 AND 5),
             message TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+        );
+    """)
+
+    # Stored server-side so a page refresh or new browser tab cannot bypass
+    # the per-user Gemini chatbot limit.
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS chatbot_daily_usage (
+            user_id INTEGER NOT NULL,
+            usage_date TEXT NOT NULL,
+            message_count INTEGER NOT NULL DEFAULT 0 CHECK (message_count >= 0),
+            PRIMARY KEY (user_id, usage_date),
             FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
         );
     """)
@@ -471,3 +487,51 @@ def save_feedback(user_id, rating, message=""):
     )
     db.commit()
     return True
+
+
+def _usage_date():
+    """Return today's date in the student-facing India time zone."""
+    return datetime.now(USAGE_TIMEZONE).date().isoformat()
+
+
+def get_chatbot_remaining(user_id, daily_limit=10):
+    """Return the number of chatbot requests still available today."""
+    if not user_id:
+        return 0
+
+    db = get_db()
+    row = db.execute(
+        """
+        SELECT message_count FROM chatbot_daily_usage
+        WHERE user_id = ? AND usage_date = ?
+        """,
+        (user_id, _usage_date()),
+    ).fetchone()
+    used = int(row["message_count"]) if row else 0
+    return max(0, daily_limit - used)
+
+
+def consume_chatbot_message(user_id, daily_limit=10):
+    """Consume one chatbot request, returning ``(allowed, remaining)``."""
+    if not user_id:
+        return False, 0
+
+    usage_date = _usage_date()
+    db = get_db()
+    db.execute(
+        """
+        INSERT OR IGNORE INTO chatbot_daily_usage (user_id, usage_date, message_count)
+        VALUES (?, ?, 0)
+        """,
+        (user_id, usage_date),
+    )
+    cursor = db.execute(
+        """
+        UPDATE chatbot_daily_usage
+        SET message_count = message_count + 1
+        WHERE user_id = ? AND usage_date = ? AND message_count < ?
+        """,
+        (user_id, usage_date, daily_limit),
+    )
+    db.commit()
+    return cursor.rowcount == 1, get_chatbot_remaining(user_id, daily_limit)

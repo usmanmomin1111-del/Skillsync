@@ -79,6 +79,7 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 # In-memory store for active session analysis
 ANALYSES = {}
+CHATBOT_DAILY_LIMIT = 10
 
 
 # -----------------------------------------------------------------------------
@@ -285,28 +286,27 @@ def analyze():
     # 5. Skill Gap Detection
     gap = skill_gap(km["matched"], km["missing"])
 
-    # Semantic scoring, optional Gemini feedback, and public internship lookup
-    # do not depend on each other.  Run them together so the user waits for the
-    # slowest service, rather than the combined time of all four operations.
-    # The displayed score and recommendation data are unchanged.
-    with ThreadPoolExecutor(max_workers=4) as executor:
+    # The core result must never wait for a third-party AI response.  Build
+    # immediate local guidance here; Gemini remains available for chatbot and
+    # interview feedback after the result page is visible.
+    summary = gemini_helper.build_local_resume_summary(
+        domain, gap["matched"], gap["missing"]
+    )
+    gap_explanation = gemini_helper.build_local_skill_gap_explanation(
+        domain, gap["missing"]
+    )
+
+    # Semantic scoring and the public internship lookup are independent.
+    with ThreadPoolExecutor(max_workers=2) as executor:
         semantic_future = executor.submit(
             semantic_similarity,
             resume_text,
             role_data["description"],
             role_data["skills"],
         )
-        summary_future = executor.submit(
-            gemini_helper.generate_resume_summary, resume_text, domain
-        )
-        gap_explanation_future = executor.submit(
-            gemini_helper.explain_skill_gaps, gap["missing"], domain
-        )
         internships_future = executor.submit(get_recommendations, domain)
 
         sem = semantic_future.result()
-        summary = summary_future.result()
-        gap_explanation = gap_explanation_future.result()
         live_internships = internships_future.result()
 
     # Hybrid ATS score
@@ -340,6 +340,7 @@ def analyze():
     # verified against AICTE's individual-listing endpoint before display.
     ranked_internships = rank_internships_for_resume(live_internships, gap["matched"])
     applied_ids = db.get_user_applied_ids(user_id) if user_id else set()
+    chatbot_remaining = db.get_chatbot_remaining(user_id, CHATBOT_DAILY_LIMIT)
 
     return render_template(
         "result.html",
@@ -356,6 +357,8 @@ def analyze():
         internships=ranked_internships,
         applied_ids=applied_ids,
         analysis_id=analysis_id,
+        chatbot_remaining=chatbot_remaining,
+        chatbot_daily_limit=CHATBOT_DAILY_LIMIT,
     )
 
 
@@ -408,6 +411,16 @@ def chatbot():
     if not message:
         return jsonify({"reply": "Ask me anything about your resume or the internship role!"})
 
+    allowed, remaining = db.consume_chatbot_message(
+        session.get("user_id"), CHATBOT_DAILY_LIMIT
+    )
+    if not allowed:
+        return jsonify({
+            "reply": "You have used all 10 chatbot messages for today. Please try again tomorrow.",
+            "remaining_messages": 0,
+            "limit_reached": True,
+        }), 429
+
     context = ""
     if analysis:
         context = (
@@ -416,7 +429,11 @@ def chatbot():
             f"Missing skills: {', '.join(analysis.get('missing', [])) or 'none'}."
         )
     reply = gemini_helper.chatbot_reply(message, context)
-    return jsonify({"reply": reply})
+    return jsonify({
+        "reply": reply,
+        "remaining_messages": remaining,
+        "limit_reached": remaining == 0,
+    })
 
 
 @app.route("/interview")

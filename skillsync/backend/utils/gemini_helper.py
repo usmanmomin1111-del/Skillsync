@@ -14,6 +14,11 @@ _configured = False
 _client = None
 _last_error = None
 GEMINI_MODEL_NAME = os.environ.get("GEMINI_MODEL_NAME", "gemini-3.8-flash")
+# A lightweight, stable alternate model for temporary capacity errors on the
+# primary model.  It can be overridden in .env without changing code.
+GEMINI_FALLBACK_MODEL = os.environ.get(
+    "GEMINI_FALLBACK_MODEL", "gemini-3.5-flash-lite"
+)
 
 
 def _get_client():
@@ -30,7 +35,18 @@ def _get_client():
 
     try:
         from google import genai
-        _client = genai.Client(api_key=api_key)
+        from google.genai import types
+
+        # Keep interactive chatbot/interview requests responsive if Gemini is
+        # temporarily overloaded.  The app can then use its safe fallback
+        # instead of making the student wait through several SDK retries.
+        _client = genai.Client(
+            api_key=api_key,
+            http_options=types.HttpOptions(
+                timeout=6_000,
+                retry_options=types.HttpRetryOptions(attempts=1),
+            ),
+        )
     except ImportError:
         _last_error = "The Google GenAI SDK is not installed. Run: python -m pip install -r requirements.txt"
     except Exception as exc:
@@ -52,11 +68,65 @@ def _ask_gemini(prompt: str, fallback: str) -> str:
             contents=prompt,
         )
         return (response.text or "").strip() or fallback
-    except Exception as exc:
+    except Exception as primary_error:
+        # 429/503/504 are capacity or temporary availability errors.  A
+        # different Flash model can often answer immediately in this case.
+        if (
+            getattr(primary_error, "code", None) in {429, 503, 504}
+            and GEMINI_FALLBACK_MODEL != GEMINI_MODEL_NAME
+        ):
+            try:
+                response = client.models.generate_content(
+                    model=GEMINI_FALLBACK_MODEL,
+                    contents=prompt,
+                )
+                text = (response.text or "").strip()
+                if text:
+                    print(
+                        f"[SkillSync] Gemini primary unavailable; "
+                        f"used fallback model {GEMINI_FALLBACK_MODEL}."
+                    )
+                    return text
+            except Exception as fallback_error:
+                print(
+                    f"[SkillSync] Gemini fallback failed ({GEMINI_FALLBACK_MODEL}): "
+                    f"{fallback_error}"
+                )
+
         # Keep API or quota details out of the browser, but preserve them in the
         # server log for troubleshooting.
-        print(f"[SkillSync] Gemini call failed ({GEMINI_MODEL_NAME}): {exc}")
+        print(
+            f"[SkillSync] Gemini call failed ({GEMINI_MODEL_NAME}): "
+            f"{primary_error}"
+        )
         return fallback
+
+
+def build_local_resume_summary(role: str, matched_skills: list, missing_skills: list) -> str:
+    """Fast, deterministic resume guidance for the main analysis result."""
+    matched = ", ".join(matched_skills[:4]) or "no core skills yet"
+    if missing_skills:
+        next_skill = missing_skills[0]
+        return (
+            f"For the {role} role, your strongest detected skills are {matched}. "
+            f"Your next best improvement is {next_skill}; add a small project or a "
+            "specific resume bullet that demonstrates it."
+        )
+    return (
+        f"For the {role} role, your resume shows strong alignment through {matched}. "
+        "Make the impact clearer by adding measurable outcomes to your project and experience bullets."
+    )
+
+
+def build_local_skill_gap_explanation(role: str, missing_skills: list) -> str:
+    """Explain missing skills without blocking the ATS result on an AI call."""
+    if not missing_skills:
+        return f"No major {role} skill gaps were detected from the selected role profile."
+    priorities = ", ".join(missing_skills[:3])
+    return (
+        f"Prioritise {priorities} first. Build one focused {role} project and mention "
+        "the tools, your contribution, and a measurable result in the resume."
+    )
 
 
 def generate_resume_summary(resume_text: str, role: str) -> str:
@@ -134,15 +204,32 @@ def evaluate_interview_answer(question: str, answer: str, role: str) -> dict:
     try:
         from google.genai import types
 
-        response = client.models.generate_content(
-            model=GEMINI_MODEL_NAME,
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                temperature=0.1,
-                max_output_tokens=180,
-            ),
+        config = types.GenerateContentConfig(
+            response_mime_type="application/json",
+            temperature=0.1,
+            max_output_tokens=180,
         )
+        try:
+            response = client.models.generate_content(
+                model=GEMINI_MODEL_NAME,
+                contents=prompt,
+                config=config,
+            )
+        except Exception as primary_error:
+            if (
+                getattr(primary_error, "code", None) not in {429, 503, 504}
+                or GEMINI_FALLBACK_MODEL == GEMINI_MODEL_NAME
+            ):
+                raise
+            response = client.models.generate_content(
+                model=GEMINI_FALLBACK_MODEL,
+                contents=prompt,
+                config=config,
+            )
+            print(
+                f"[SkillSync] Gemini interview scoring used fallback model "
+                f"{GEMINI_FALLBACK_MODEL}."
+            )
         result = json.loads(response.text or "{}")
         score = round(float(result.get("score")), 1)
         feedback = str(result.get("feedback", "")).strip()

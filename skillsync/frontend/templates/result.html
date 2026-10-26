@@ -146,11 +146,11 @@
 
 <section class="card">
   <h3>💬 Advisory Chatbot</h3>
-  <p class="muted">Ask a follow-up question about your resume or this role.</p>
+  <p class="muted">Ask a follow-up question about your resume or this role. <span id="chat-remaining">{{ chatbot_remaining }} of {{ chatbot_daily_limit }} messages remaining today.</span></p>
   <div id="chat-log" class="chat-log"></div>
   <form id="chat-form" class="chat-form">
-    <input type="text" id="chat-input" placeholder="e.g. How can I improve my ATS score?" autocomplete="off">
-    <button type="submit" class="btn-primary">Send</button>
+    <input type="text" id="chat-input" placeholder="e.g. How can I improve my ATS score?" autocomplete="off" {% if chatbot_remaining <= 0 %}disabled{% endif %}>
+    <button type="submit" class="btn-primary" {% if chatbot_remaining <= 0 %}disabled{% endif %}>Send</button>
   </form>
 </section>
 
@@ -164,6 +164,8 @@
 const chatForm = document.getElementById('chat-form');
 const chatInput = document.getElementById('chat-input');
 const chatLog = document.getElementById('chat-log');
+const chatSubmit = chatForm.querySelector('button[type="submit"]');
+const chatRemaining = document.getElementById('chat-remaining');
 
 function addMessage(text, who) {
   const div = document.createElement('div');
@@ -171,6 +173,15 @@ function addMessage(text, who) {
   div.textContent = text;
   chatLog.appendChild(div);
   chatLog.scrollTop = chatLog.scrollHeight;
+}
+
+function updateChatLimit(remaining) {
+  if (typeof remaining !== 'number') return;
+  chatRemaining.textContent = `${remaining} of {{ chatbot_daily_limit }} messages remaining today.`;
+  if (remaining <= 0) {
+    chatInput.disabled = true;
+    chatSubmit.disabled = true;
+  }
 }
 
 chatForm.addEventListener('submit', async (e) => {
@@ -190,6 +201,7 @@ chatForm.addEventListener('submit', async (e) => {
     const data = await res.json();
     document.querySelector('.chat-msg.pending').remove();
     addMessage(data.reply, 'bot');
+    updateChatLimit(data.remaining_messages);
   } catch (err) {
     document.querySelector('.chat-msg.pending').remove();
     addMessage('Something went wrong reaching the chatbot.', 'bot');
