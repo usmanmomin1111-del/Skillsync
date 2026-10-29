@@ -14,7 +14,8 @@ from flask import g, has_app_context
 from werkzeug.security import generate_password_hash, check_password_hash
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-DB_PATH = str(PROJECT_ROOT / "data" / "skillsync.db")
+DATA_DIR = Path(os.environ.get("SKILLSYNC_DATA_DIR", str(PROJECT_ROOT / "data")))
+DB_PATH = str(DATA_DIR / "skillsync.db")
 # India has a fixed UTC+05:30 offset and does not observe daylight saving time.
 # Using the standard-library offset keeps the app portable on Windows hosts
 # that do not ship the IANA time-zone database.

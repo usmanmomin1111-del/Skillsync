@@ -18,13 +18,14 @@ from urllib.parse import urlparse, urljoin
 
 PROJECT_ROOT = Path(__file__).resolve().parent
 FRONTEND_DIR = PROJECT_ROOT / "frontend"
-DATA_DIR = PROJECT_ROOT / "data"
 
 try:
     from dotenv import load_dotenv
     load_dotenv(PROJECT_ROOT / ".env")
 except Exception:
     pass  # .env file unreadable — use fallback below
+
+DATA_DIR = Path(os.environ.get("SKILLSYNC_DATA_DIR", str(PROJECT_ROOT / "data")))
 
 from flask import (
     Flask,
@@ -70,6 +71,10 @@ app.config["FIREBASE_CONFIG"] = {
     "appId": os.environ.get("FIREBASE_APP_ID", "1:144312228609:web:f8ddb11ad7a5c28eb31900"),
     "measurementId": os.environ.get("FIREBASE_MEASUREMENT_ID", "G-W0JTGCTHJL"),
 }
+
+# Create the data path before opening SQLite. On Render, set
+# SKILLSYNC_DATA_DIR=/var/data and mount a persistent disk there.
+DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 # Initialize SQLite database schema
 db.init_db(app)
